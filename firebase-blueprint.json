@@ -1,0 +1,103 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Application user with role-based access",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["student", "faculty_staff", "admin"] },
+        "displayName": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "ICT equipment asset",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "defective", "under_repair", "disposed"] },
+        "price": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "name", "category", "status"]
+    },
+    "ServiceRequest": {
+      "title": "Service Request",
+      "description": "ICT support job order",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "description": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "completed", "rejected"] },
+        "userId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "description", "priority", "status", "userId"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Facility reservation",
+      "type": "object",
+      "properties": {
+        "facilityId": { "type": "string" },
+        "facilityName": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "purpose": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "cancelled"] },
+        "userId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["facilityId", "date", "startTime", "endTime", "purpose", "status", "userId"]
+    },
+    "Incident": {
+      "title": "Incident",
+      "description": "Damage or liability report",
+      "type": "object",
+      "properties": {
+        "user": { "type": "string" },
+        "item": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "deadline": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["unresolved", "resolved"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user", "item", "description", "amount", "deadline", "status"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Registered users and their roles"
+    },
+    "inventory": {
+      "schema": "InventoryItem",
+      "description": "Equipment inventory"
+    },
+    "requests": {
+      "schema": "ServiceRequest",
+      "description": "ICT service requests"
+    },
+    "bookings": {
+      "schema": "Booking",
+      "description": "Facility reservations"
+    },
+    "incidents": {
+      "schema": "Incident",
+      "description": "Liability records"
+    }
+  }
+}

@@ -1,0 +1,128 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 3. Primitives
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserData().role == 'admin';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
+             data.keys().size() <= 6 &&
+             data.uid == request.auth.uid &&
+             data.email is string &&
+             data.role in ['student', 'faculty_staff', 'admin'];
+    }
+
+    function isValidInventoryItem(data) {
+      return data.keys().hasAll(['code', 'name', 'category', 'status']) &&
+             data.code is string && data.code.size() <= 64 &&
+             data.name is string && data.name.size() <= 128 &&
+             data.category is string &&
+             data.status in ['active', 'defective', 'under_repair', 'disposed'] &&
+             (data.get('price', 0) is number);
+    }
+
+    function isValidServiceRequest(data) {
+      return data.keys().hasAll(['type', 'description', 'priority', 'status', 'userId']) &&
+             data.userId == request.auth.uid &&
+             data.type is string &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.priority in ['low', 'medium', 'high', 'urgent'] &&
+             data.status in ['pending', 'approved', 'completed', 'rejected'];
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll(['facilityId', 'date', 'startTime', 'endTime', 'purpose', 'status', 'userId']) &&
+             data.userId == request.auth.uid &&
+             data.facilityId is string &&
+             data.date is string &&
+             data.purpose is string && data.purpose.size() <= 500 &&
+             data.status in ['pending', 'approved', 'cancelled'];
+    }
+
+    function isValidIncident(data) {
+      return data.keys().hasAll(['user', 'item', 'description', 'amount', 'deadline', 'status']) &&
+             data.user is string &&
+             data.item is string &&
+             data.description is string &&
+             data.amount is number &&
+             data.status in ['unresolved', 'resolved'];
+    }
+
+    // --- Collections ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && userId == request.auth.uid && isValidUser(incoming());
+      allow update: if isSignedIn() && userId == request.auth.uid && 
+                   incoming().role == existing().role && // Prevent self-promoting to admin
+                   isValidUser(incoming()) &&
+                   incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'email']);
+    }
+
+    match /inventory/{itemId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidInventoryItem(incoming());
+      allow update: if isAdmin() && isValidInventoryItem(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /requests/{requestId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidServiceRequest(incoming()) && incoming().status == 'pending';
+      allow update: if isSignedIn() && (
+        (isOwner(existing().userId) && incoming().status == existing().status && incoming().diff(existing()).affectedKeys().hasOnly(['description', 'priority'])) ||
+        (isAdmin() && isValidServiceRequest(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidBooking(incoming()) && incoming().status == 'pending';
+      allow update: if isSignedIn() && (
+        (isOwner(existing().userId) && existing().status == 'pending' && incoming().diff(existing()).affectedKeys().hasOnly(['purpose', 'startTime', 'endTime', 'date', 'status']) && (incoming().status == 'cancelled' || incoming().status == 'pending')) ||
+        (isAdmin() && isValidBooking(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /incidents/{incidentId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && isValidIncident(incoming());
+    }
+  }
+}
